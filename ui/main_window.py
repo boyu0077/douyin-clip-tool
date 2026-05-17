@@ -322,15 +322,9 @@ class MainWindow(QMainWindow):
         dialog.exec()
     
     def _dedup_current(self):
-        """对选中的素材执行去重"""
-        item = self.media_list.currentItem()
-        if not item:
-            QMessageBox.warning(self, "提示", "请先从素材列表中选择一个视频")
-            return
-
-        input_path = item.data(MEDIA_PATH_ROLE)
-        if not input_path or not Path(input_path).exists():
-            QMessageBox.warning(self, "提示", "源文件不存在，请重新导入")
+        """一键去重：有选中素材直接用，没有则弹窗选择后自动去重"""
+        input_path = self._get_selected_or_import()
+        if not input_path:
             return
 
         output_dir = str(Path.home() / "Documents" / "DouyinClipTool" / "output")
@@ -341,22 +335,55 @@ class MainWindow(QMainWindow):
         output_path = os.path.join(output_dir, f"{stem}_dedup.mp4")
 
         self.progress_bar.show()
-        self._log(f"开始去重: {preset}")
+        self.progress_label.show()
+        self._log(f"一键去重: {Path(input_path).name} | 模板: {preset}")
+
+        import threading
 
         def progress_cb(pct, msg):
             self.progress_updated.emit(int(pct), msg)
 
-        import threading
         def run():
             success, msg = dedup_engine.process_video(
                 input_path, output_path, preset, progress_cb
             )
             if success:
                 self.log_signal.emit(f"去重完成: {output_path}")
+                self.progress_updated.emit(100, "完成！文件在Documents/DouyinClipTool/output/")
             else:
                 self.log_signal.emit(f"去重失败: {msg}")
 
         threading.Thread(target=run, daemon=True).start()
+
+    def _get_selected_or_import(self) -> str | None:
+        """获取当前选中素材路径，没有则弹窗导入"""
+        item = self.media_list.currentItem()
+        if item:
+            path = item.data(MEDIA_PATH_ROLE)
+            if path and Path(path).exists():
+                return path
+
+        # 列表为空或无有效选中 → 自动弹窗导入
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "选择要处理的视频", "",
+            "视频文件 (*.mp4 *.mov *.avi *.mkv *.flv);;所有文件 (*)"
+        )
+        if not paths:
+            return None
+
+        for p in paths:
+            info = ffmpeg.get_video_info(p)
+            dur = info.get("duration", 0) if info else 0
+            item = QListWidgetItem(f"{Path(p).name} ({dur:.1f}s)")
+            item.setData(MEDIA_PATH_ROLE, p)
+            self.media_list.addItem(item)
+            self._log(f"导入: {Path(p).name}")
+
+        # 选中第一个
+        if self.media_list.count() > 0:
+            self.media_list.setCurrentRow(0)
+            return paths[0]
+        return None
     
     def _batch_dedup(self):
         dialog = BatchDedupDialog(self)
