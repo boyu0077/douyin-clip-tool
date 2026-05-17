@@ -28,6 +28,11 @@ class DedupPreset:
     shake_enabled: bool
     blur_edges: bool
     audio_pitch_change: float
+    pip_enabled: bool = False     # 画中画分层
+    pip_scale: float = 0.33       # 画中画小窗比例
+    pip_x: str = "right"          # 小窗X位置: left/center/right
+    pip_y: str = "bottom"         # 小窗Y位置: top/middle/bottom
+    pip_opacity: float = 0.85     # 小窗不透明度
 
     def to_dict(self) -> dict:
         return {
@@ -252,6 +257,31 @@ DEDUP_TEMPLATES = {
         shake_enabled=True,
         blur_edges=True,
         audio_pitch_change=0.03,
+    ),
+    "画中画去重": DedupPreset(
+        name="画中画去重",
+        description="视频分两层：主画面+右下小窗，大幅改变画面指纹",
+        mirror=True,
+        speed_change=0.02,
+        crop_percent=0.01,
+        scale_range=(0.99, 1.01),
+        rotation_range=(-0.5, 0.5),
+        brightness_range=(-0.02, 0.03),
+        contrast_range=(-0.04, 0.04),
+        saturation_range=(0.01, 0.05),
+        frame_offset=2,
+        drop_frames=1,
+        border_enabled=False,
+        watermark_enabled=False,
+        filter_enabled=False,
+        shake_enabled=False,
+        blur_edges=True,
+        audio_pitch_change=0.02,
+        pip_enabled=True,
+        pip_scale=0.33,
+        pip_x="right",
+        pip_y="bottom",
+        pip_opacity=0.85,
     ),
 }
 

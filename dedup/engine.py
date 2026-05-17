@@ -31,7 +31,12 @@ class DedupConfig:
     watermark_text: str = ""
     audio_pitch: float = 0.0
     audio_volume_db: float = 0.0
-    
+    pip_enabled: bool = False
+    pip_scale: float = 0.33
+    pip_x: str = "right"
+    pip_y: str = "bottom"
+    pip_opacity: float = 0.85
+
     def randomize(self) -> dict:
         """随机化参数（在范围内取随机值）"""
         return {
@@ -51,8 +56,13 @@ class DedupConfig:
             "blur_edges": self.blur_edges,
             "audio_pitch": self.audio_pitch,
             "audio_volume_db": self.audio_volume_db,
+            "pip_enabled": self.pip_enabled,
+            "pip_scale": self.pip_scale,
+            "pip_x": self.pip_x,
+            "pip_y": self.pip_y,
+            "pip_opacity": self.pip_opacity,
         }
-    
+
     @classmethod
     def from_preset(cls, preset: DedupPreset) -> "DedupConfig":
         return cls(
@@ -71,6 +81,11 @@ class DedupConfig:
             shake=preset.shake_enabled,
             blur_edges=preset.blur_edges,
             audio_pitch=preset.audio_pitch_change,
+            pip_enabled=preset.pip_enabled,
+            pip_scale=preset.pip_scale,
+            pip_x=preset.pip_x,
+            pip_y=preset.pip_y,
+            pip_opacity=preset.pip_opacity,
         )
 
 
@@ -224,14 +239,45 @@ class DedupEngine:
         if abs(vol) > 0.1:
             af_filters.append(f"volume={vol}dB")
         
+        # === 14. 画中画分层（视频分两层） ===
+        use_pip = params.get("pip_enabled", False)
+        pip_scale = params.get("pip_scale", 0.33)
+        pip_x = params.get("pip_x", "right")
+        pip_y = params.get("pip_y", "bottom")
+        pip_opacity = params.get("pip_opacity", 0.85)
+
         # === 构建FFmpeg命令 ===
         args = ["-i", input_path]
-        
-        if vf_filters:
-            args += ["-vf", ",".join(vf_filters)]
+
+        # 计算小窗尺寸（相对主画面9:16 = 1080x1920）
+        pip_w = int(1080 * pip_scale)
+        pip_h = int(1920 * pip_scale)
+
+        # 计算小窗位置
+        x_map = {"left": 20, "center": f"(1080-{pip_w})/2", "right": f"1080-{pip_w}-20"}
+        y_map = {"top": 20, "middle": f"(1920-{pip_h})/2", "bottom": f"1920-{pip_h}-20"}
+        ov_x = x_map.get(pip_x, f"1080-{pip_w}-20")
+        ov_y = y_map.get(pip_y, f"1920-{pip_h}-20")
+
+        if use_pip:
+            # 使用 filter_complex 实现画中画
+            vf_chain = ",".join(vf_filters) if vf_filters else "copy"
+            filter_complex = (
+                f"[0:v]{vf_chain},split[main][pip];"
+                f"[pip]scale={pip_w}:{pip_h},format=rgba,"
+                f"colorchannelmixer=aa={pip_opacity}[pip_a];"
+                f"[main][pip_a]overlay={ov_x}:{ov_y}[vout]"
+            )
+            args += ["-filter_complex", filter_complex, "-map", "[vout]"]
+        else:
+            if vf_filters:
+                args += ["-vf", ",".join(vf_filters)]
+
         if af_filters:
             args += ["-af", ",".join(af_filters)]
-        
+
+        if use_pip:
+            args += ["-map", "0:a"]
         args += [
             "-c:v", "libx264", "-preset", "fast", "-crf", "22",
             "-pix_fmt", "yuv420p",
