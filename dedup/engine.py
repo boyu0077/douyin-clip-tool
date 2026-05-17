@@ -129,9 +129,11 @@ class DedupEngine:
     ) -> tuple[bool, str]:
         """核心去重执行（FFmpeg滤镜链）"""
         
+        if not os.path.exists(input_path):
+            return False, f"视频文件不存在: {input_path}"
         info = ffmpeg.get_video_info(input_path)
         if not info:
-            return False, "无法读取视频信息"
+            return False, f"无法读取视频信息(ffprobe={ffmpeg.ffprobe}, file={input_path})"
         
         dur = info.get("duration", 0)
         w = info.get("video_width", 1080)

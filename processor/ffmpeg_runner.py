@@ -11,15 +11,21 @@ from config.settings import get_ffmpeg_path, get_ffprobe_path
 
 class FFmpegRunner:
     """FFmpeg命令执行器"""
-    
+
     def __init__(self):
-        self.ffmpeg = get_ffmpeg_path()
-        self.ffprobe = get_ffprobe_path()
         self._progress_callback = None
-    
+
+    @property
+    def ffmpeg(self) -> str:
+        return get_ffmpeg_path()
+
+    @property
+    def ffprobe(self) -> str:
+        return get_ffprobe_path()
+
     def set_progress_callback(self, callback):
         self._progress_callback = callback
-    
+
     def run(self, args: list[str], progress: bool = True) -> tuple[bool, str]:
         """
         执行FFmpeg命令
@@ -29,7 +35,7 @@ class FFmpegRunner:
         if progress:
             cmd += ["-progress", "pipe:1", "-nostats"]
         cmd += args
-        
+
         try:
             process = subprocess.Popen(
                 cmd,
@@ -38,18 +44,18 @@ class FFmpegRunner:
                 text=True,
                 bufsize=1,
             )
-            
+
             stdout, stderr = process.communicate()
-            
+
             if process.returncode != 0:
                 return False, stderr or "FFmpeg执行失败"
-            
+
             return True, stdout
         except FileNotFoundError:
             return False, f"FFmpeg未找到: {self.ffmpeg}"
         except Exception as e:
             return False, str(e)
-    
+
     def get_video_info(self, filepath: str) -> dict:
         """获取视频元信息"""
         cmd = [

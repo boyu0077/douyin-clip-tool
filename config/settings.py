@@ -10,31 +10,54 @@ from dataclasses import dataclass, field, asdict
 
 APP_NAME = "抖音切片剪辑工具"
 APP_VERSION = "1.0.0"
+IS_WINDOWS = sys.platform == "win32"
+FFMPEG_EXE = "ffmpeg.exe" if IS_WINDOWS else "ffmpeg"
+FFPROBE_EXE = "ffprobe.exe" if IS_WINDOWS else "ffprobe"
 
-# PyInstaller 打包后资源路径
-if getattr(sys, "frozen", False):
-    _MEIPASS = Path(sys._MEIPASS)
-else:
-    _MEIPASS = Path(__file__).parent.parent  # 项目根目录
+
+def _get_bundle_dir() -> Path:
+    """获取PyInstaller打包后的资源目录"""
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS)
+    return Path(__file__).parent.parent
+
+
+def _find_ffmpeg(name: str) -> str:
+    """在多个可能位置查找FFmpeg二进制"""
+    search_paths = []
+
+    if getattr(sys, "frozen", False):
+        base = Path(sys._MEIPASS)
+        # PyInstaller --add-binary 解压后的路径
+        search_paths += [
+            base / "bin" / name,
+            base / name,
+        ]
+
+    # 可执行文件同目录（用户手动放入）
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).parent
+        search_paths.append(exe_dir / name)
+
+    # 开发模式下的常见路径
+    search_paths.append(Path(__file__).parent.parent / "bin" / name)
+
+    for p in search_paths:
+        if p.exists():
+            return str(p)
+
+    # fallback: 系统PATH
+    return name
 
 
 def get_ffmpeg_path() -> str:
-    """获取FFmpeg二进制路径（兼容开发模式与PyInstaller打包）"""
-    if getattr(sys, "frozen", False):
-        bundled = _MEIPASS / "bin" / "ffmpeg"
-        if bundled.exists():
-            return str(bundled)
-    # 开发模式或打包未包含时使用系统FFmpeg
-    return "ffmpeg"
+    """获取FFmpeg二进制路径"""
+    return _find_ffmpeg(FFMPEG_EXE)
 
 
 def get_ffprobe_path() -> str:
     """获取ffprobe二进制路径"""
-    if getattr(sys, "frozen", False):
-        bundled = _MEIPASS / "bin" / "ffprobe"
-        if bundled.exists():
-            return str(bundled)
-    return "ffprobe"
+    return _find_ffmpeg(FFPROBE_EXE)
 
 
 # 基础路径
