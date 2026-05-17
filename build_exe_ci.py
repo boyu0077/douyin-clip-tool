@@ -9,6 +9,10 @@ import shutil
 import subprocess
 from pathlib import Path
 
+# Fix Windows console encoding for Chinese output
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 PROJECT_DIR = Path(__file__).parent
 DIST_DIR = PROJECT_DIR / "dist"
 BUILD_DIR = PROJECT_DIR / "build"
