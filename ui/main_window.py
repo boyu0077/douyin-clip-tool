@@ -21,7 +21,7 @@ from core.project import Project
 from core.clip import Clip
 from core.timeline_model import TimelineModel
 from config.presets import DEDUP_TEMPLATES, EXPORT_PRESETS, DEDUP_PRESETS
-from config.settings import app_config
+from config.settings import app_config, get_ffmpeg_path, get_ffprobe_path
 from dedup.engine import dedup_engine
 from dedup.batch.batch_processor import batch_processor, BatchTask
 from processor.ffmpeg_runner import ffmpeg
@@ -56,6 +56,19 @@ class MainWindow(QMainWindow):
         self._setup_batch_processor()
         
         self._log("应用启动完成 - 就绪")
+        # FFmpeg自检
+        import subprocess
+        ffmpeg_path = get_ffmpeg_path()
+        try:
+            result = subprocess.run([ffmpeg_path, "-version"], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                self._log(f"FFmpeg已就绪: {ffmpeg_path}")
+            else:
+                self._log(f"FFmpeg异常: {ffmpeg_path}")
+        except FileNotFoundError:
+            self._log(f"FFmpeg未找到: {ffmpeg_path}，去重功能不可用。请将ffmpeg.exe放入exe同目录")
+        except Exception as e:
+            self._log(f"FFmpeg启动失败: {e}")
     
     def _setup_menu(self):
         menubar = self.menuBar()

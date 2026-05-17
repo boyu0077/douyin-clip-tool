@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional, Callable
 from dataclasses import dataclass
 from config.presets import DEDUP_TEMPLATES, DedupPreset
+from config.settings import get_ffprobe_path
 from processor.ffmpeg_runner import ffmpeg
 
 
@@ -133,7 +134,10 @@ class DedupEngine:
             return False, f"视频文件不存在: {input_path}"
         info = ffmpeg.get_video_info(input_path)
         if not info:
-            return False, f"无法读取视频信息(ffprobe={ffmpeg.ffprobe}, file={input_path})"
+            # 诊断信息
+            ffprobe_path = get_ffprobe_path()
+            exists = os.path.exists(ffprobe_path) if os.path.exists(ffprobe_path) else False
+            return False, f"无法读取视频信息。ffprobe路径={ffprobe_path}, 存在={exists}, 文件={input_path}"
         
         dur = info.get("duration", 0)
         w = info.get("video_width", 1080)
